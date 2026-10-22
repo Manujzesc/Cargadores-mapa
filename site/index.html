@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cargadores Model 3</title>
+<meta name="theme-color" content="#111418">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css">
+<style>
+  :root {
+    --bg: #ffffff; --fg: #15181c; --muted: #5d6670; --line: #e3e6ea; --panel: rgba(255,255,255,.96);
+    --rapido: #d93a2b; --lento: #2f6fdf; --comida: #c27a0e; --dormir: #7a4fd1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#111418; --fg:#eef1f4; --muted:#9aa4ae; --line:#2a3038; --panel: rgba(24,28,33,.96); }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #map { position: fixed; inset: 0; }
+  .panel { position: fixed; z-index: 1000; left: 12px; right: 12px; top: max(12px, env(safe-area-inset-top));
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.15); max-width: 520px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 999px;
+    border: 1.5px solid var(--line); background: transparent; color: var(--fg); font: inherit; font-size: 14px;
+    cursor: pointer; user-select: none; }
+  .chip .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+  .chip[aria-pressed="true"] { border-color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }
+  .meta { margin-top: 6px; font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+  .btn-loc { position: fixed; z-index: 1000; right: 12px; bottom: max(24px, env(safe-area-inset-bottom));
+    width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel);
+    color: var(--fg); font-size: 22px; box-shadow: 0 4px 16px rgba(0,0,0,.2); cursor: pointer; }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--panel); color: var(--fg); }
+  .leaflet-popup-content { margin: 12px 14px; min-width: 230px; }
+  .p-name { font-weight: 650; font-size: 15px; margin-bottom: 2px; }
+  .p-sub { color: var(--muted); font-size: 12.5px; margin-bottom: 6px; }
+  .p-conn { font-weight: 600; margin: 6px 0; }
+  .p-list { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
+  .p-h { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-top: 8px; }
+  .p-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .p-actions a { flex: 1; text-align: center; padding: 8px 6px; border-radius: 10px; text-decoration: none;
+    font-weight: 600; font-size: 13.5px; }
+  .a-go { background: #1a73e8; color: #fff !important; }
+  .a-see { border: 1px solid var(--line); color: var(--fg) !important; }
+  .loading { opacity: .5; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="panel">
+  <div class="row" id="layers">
+    <button class="chip" data-layer="rapidos" style="--c:var(--rapido)" aria-pressed="true"><span class="dot"></span>Rápidos CCS2</button>
+    <button class="chip" data-layer="lentos" style="--c:var(--lento)" aria-pressed="false"><span class="dot"></span>Lentos Tipo 2</button>
+    <button class="chip" data-layer="comida" style="--c:var(--comida)" aria-pressed="false"><span class="dot"></span>☕ Comer</button>
+    <button class="chip" data-layer="dormir" style="--c:var(--dormir)" aria-pressed="false"><span class="dot"></span>🛏️ Dormir</button>
+  </div>
+  <div class="meta"><span id="count">Cargando…</span><span id="updated"></span></div>
+</div>
+
+<button class="btn-loc" id="loc" title="Mi ubicación">◎</button>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<script>
+const COLORS = { rapidos: '#d93a2b', lentos: '#2f6fdf', comida: '#c27a0e', dormir: '#7a4fd1' };
+const map = L.map('map', { zoomControl: false, preferCanvas: true }).setView([37.4, -4.2], 7);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19, attribution: '© OpenStreetMap · Datos: DGT/MITECO'
+}).addTo(map);
+L.control.zoom({ position: 'bottomleft' }).addTo(map);
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function popup(f) {
+  const p = f.properties, [lon, lat] = f.geometry.coordinates;
+  const go = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
+  const see = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+  let h = `<div class="p-name">${esc(p.nombre)}</div>`;
+  const sub = [p.operador, p.direccion].filter(Boolean).map(esc).join(' · ');
+  if (sub) h += `<div class="p-sub">${sub}</div>`;
+  h += `<div class="p-conn">⚡ ${esc(p.conectores)}</div>`;
+  if (p.horario) h += `<div>🕑 ${esc(p.horario)}</div>`;
+  if (p.comida?.length || p.serv_comida) {
+    h += `<div class="p-h">Para comer${p.n_comida > 3 ? ` (${p.n_comida} cerca)` : ''}</div>`;
+    h += p.comida?.length ? `<ul class="p-list">${p.comida.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : `<div>Declarado por el operador</div>`;
+  }
+  if (p.dormir?.length || p.serv_hotel) {
+    h += `<div class="p-h">Para dormir${p.n_dormir > 3 ? ` (${p.n_dormir} cerca)` : ''}</div>`;
+    h += p.dormir?.length ? `<ul class="p-list">${p.dormir.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : `<div>Declarado por el operador</div>`;
+  }
+  h += `<div class="p-actions"><a class="a-go" href="${go}" target="_blank" rel="noopener">Ir (Google Maps)</a>` +
+       `<a class="a-see" href="${see}" target="_blank" rel="noopener">Ver sitio</a></div>`;
+  return h;
+}
+
+function clusterIcon(color) {
+  return c => {
+    const n = c.getChildCount();
+    const s = n < 10 ? 30 : n < 100 ? 36 : 44;
+    return L.divIcon({
+      html: `<div style="width:${s}px;height:${s}px;border-radius:50%;background:${color};color:#fff;display:flex;align-items:center;justify-content:center;font:600 12px system-ui;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)">${n}</div>`,
+      className: '', iconSize: [s, s]
+    });
+  };
+}
+
+const layers = {};   // name -> {group, loaded, count}
+async function ensure(name) {
+  if (layers[name]?.loaded) return layers[name];
+  const color = COLORS[name];
+  const group = L.markerClusterGroup({ chunkedLoading: true, showCoverageOnHover: false,
+    maxClusterRadius: 50, disableClusteringAtZoom: 15, iconCreateFunction: clusterIcon(color) });
+  const res = await fetch(`data/${name}.geojson`, { cache: 'no-cache' });
+  const gj = await res.json();
+  const markers = gj.features.map(f => {
+    const [lon, lat] = f.geometry.coordinates;
+    const big = (f.properties.kw_max || 0) >= 100;
+    return L.circleMarker([lat, lon], { radius: big ? 8 : 6, color: '#fff', weight: 2, fillColor: color, fillOpacity: 1 })
+      .bindPopup(() => popup(f), { maxWidth: 320 });
+  });
+  group.addLayers(markers);
+  layers[name] = { group, loaded: true, count: markers.length };
+  return layers[name];
+}
+
+function updateCount() {
+  const on = [...document.querySelectorAll('.chip[aria-pressed="true"]')].map(b => b.dataset.layer);
+  const total = on.reduce((a, n) => a + (layers[n]?.count || 0), 0);
+  document.getElementById('count').textContent = on.length ? `${total.toLocaleString('es-ES')} puntos visibles` : 'Ninguna capa activa';
+}
+
+async function toggle(btn, force) {
+  const name = btn.dataset.layer;
+  const on = force ?? btn.getAttribute('aria-pressed') !== 'true';
+  btn.classList.add('loading');
+  try {
+    const l = await ensure(name);
+    if (on) map.addLayer(l.group); else map.removeLayer(l.group);
+    btn.setAttribute('aria-pressed', on);
+    try { localStorage.setItem('capa_' + name, on ? '1' : '0'); } catch (e) {}
+  } catch (e) {
+    document.getElementById('count').textContent = 'Error cargando datos';
+  }
+  btn.classList.remove('loading');
+  updateCount();
+}
+
+document.querySelectorAll('.chip').forEach(b => {
+  b.addEventListener('click', () => toggle(b));
+  let saved = null;
+  try { saved = localStorage.getItem('capa_' + b.dataset.layer); } catch (e) {}
+  const on = saved === null ? b.getAttribute('aria-pressed') === 'true' : saved === '1';
+  if (on) toggle(b, true); else b.setAttribute('aria-pressed', 'false');
+});
+
+fetch('data/resumen.json', { cache: 'no-cache' }).then(r => r.json()).then(r => {
+  const d = new Date(r.actualizado);
+  document.getElementById('updated').textContent = 'Actualizado ' + d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+}).catch(() => {});
+
+let me;
+document.getElementById('loc').addEventListener('click', () => {
+  map.locate({ setView: true, maxZoom: 12 });
+});
+map.on('locationfound', e => {
+  if (me) me.setLatLng(e.latlng); else me = L.circleMarker(e.latlng, { radius: 8, color: '#fff', weight: 3, fillColor: '#1a73e8', fillOpacity: 1 }).addTo(map);
+});
+</script>
+</body>
+</html>
