@@ -2,7 +2,7 @@
 
 Mapa de puntos de recarga públicos de España compatibles con Tesla Model 3, actualizado cada día.
 
-**Mapa:** https://manujzesc.github.io/cargadores-mapa/
+**Mapa:** https://manujzesc.github.io/Cargadores-mapa/
 
 ## Capas
 
