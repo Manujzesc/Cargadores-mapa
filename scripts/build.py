@@ -187,7 +187,7 @@ def download(url, dest, timeout=300, data=None, tries=3):
             last = e
             print(f"  intento {i + 1} fallido ({url}): {e}", file=sys.stderr)
             time.sleep(10 * (i + 1))
-    print(f"  ERROR descargando {url}: {last}", file=sys.stderr)
+    print(f"::warning::ERROR descargando {url}: {last}")
     return False
 
 
@@ -211,7 +211,7 @@ def load_sites(xml_path):
             continue
         seen.add(key)
         sites.append(s)
-    print(f"DGT: {total} emplazamientos en el fichero, {len(sites)} compatibles (CCS2/Tipo 2)")
+    print(f"::notice::DGT: {total} emplazamientos en el fichero, {len(sites)} compatibles (CCS2/Tipo 2)")
     return sites, total
 
 
@@ -321,7 +321,10 @@ def main():
             sys.exit(1)
     sites, total = load_sites(xml_path)
     if len(sites) < 100 and not os.environ.get("ALLOW_SMALL"):
-        print("Demasiados pocos emplazamientos: algo ha ido mal, no se publica.", file=sys.stderr)
+        size = os.path.getsize(xml_path)
+        with open(xml_path, "rb") as f:
+            head = f.read(600).decode("utf-8", "replace").replace("\n", " ")
+        print(f"::error::Solo {len(sites)} emplazamientos (fichero {size} bytes). Inicio: {head}")
         sys.exit(1)
 
     if os.environ.get("SKIP_OSM"):
@@ -363,7 +366,7 @@ def main():
     }
     with open(os.path.join(out, "resumen.json"), "w", encoding="utf-8") as f:
         json.dump(resumen, f, ensure_ascii=False, indent=1)
-    print(json.dumps(resumen, ensure_ascii=False))
+    print("::notice::" + json.dumps(resumen, ensure_ascii=False))
 
 
 if __name__ == "__main__":
