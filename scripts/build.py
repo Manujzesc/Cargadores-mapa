@@ -34,7 +34,12 @@ OVERPASS_URLS = [
 ]
 RADIO_COMIDA = 250   # metros
 RADIO_HOTEL = 600    # metros
-UA = "cargadores-mapa (github.com/Manujzesc/cargadores-mapa)"
+UA = "cargadores-mapa (github.com/Manujzesc/Cargadores-mapa)"
+BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
+    "Accept": "application/xml,text/xml,*/*;q=0.8",
+    "Accept-Language": "es-ES,es;q=0.9",
+}
 
 # Tipos de servicio DATEX II declarados por el operador
 SERV_COMIDA = {"restaurant", "cafe", "bar", "fastfood", "fastFood", "foodshop"}
@@ -171,11 +176,11 @@ def parse_site(site):
     }
 
 
-def download(url, dest, timeout=300, data=None, tries=3):
+def download(url, dest, timeout=300, data=None, tries=3, headers=None):
     last = None
     for i in range(tries):
         try:
-            req = urllib.request.Request(url, data=data, headers={"User-Agent": UA})
+            req = urllib.request.Request(url, data=data, headers=headers or {"User-Agent": UA})
             with urllib.request.urlopen(req, timeout=timeout) as r, open(dest, "wb") as f:
                 while True:
                     chunk = r.read(1 << 20)
@@ -317,7 +322,7 @@ def main():
     xml_path = os.environ.get("DGT_XML") or os.path.join(work, "electrolineras.xml")
     if not os.environ.get("DGT_XML"):
         print("DGT: descargando…")
-        if not download(DGT_URL, xml_path, timeout=600):
+        if not download(DGT_URL, xml_path, timeout=600, tries=1, headers=BROWSER_HEADERS):
             sys.exit(1)
     sites, total = load_sites(xml_path)
     if len(sites) < 100 and not os.environ.get("ALLOW_SMALL"):
