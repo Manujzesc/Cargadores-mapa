@@ -2,10 +2,8 @@ name: Actualizar mapa
 
 on:
   schedule:
-    - cron: "17 4 * * *"   # cada día ~06:17 hora de España
-  workflow_dispatch:
-  push:
-    branches: [main]
+    - cron: "0 9 * * 1"   # lunes 09:00 UTC = 10:00 en invierno / 11:00 en verano (hora de España)
+  workflow_dispatch:      # para lanzarlo a mano desde Actions
 
 permissions:
   contents: read

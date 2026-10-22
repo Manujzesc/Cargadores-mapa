@@ -1,6 +1,6 @@
 # Cargadores Model 3
 
-Mapa de puntos de recarga públicos de España compatibles con Tesla Model 3, actualizado cada día.
+Mapa de puntos de recarga públicos de España compatibles con Tesla Model 3, actualizado cada lunes.
 
 **Mapa:** https://manujzesc.github.io/Cargadores-mapa/
 
@@ -15,7 +15,7 @@ Cada punto tiene un botón para abrirlo en Google Maps y, desde ahí, compartirl
 
 ## Cómo funciona
 
-`.github/workflows/actualizar.yml` se ejecuta cada día: `scripts/build.py` descarga el fichero
+`.github/workflows/actualizar.yml` se ejecuta cada lunes a las 10:00 (hora de España en invierno), un solo intento: `scripts/build.py` descarga el fichero
 público de la DGT (datos del Ministerio) y los sitios de OpenStreetMap, genera los GeoJSON en
 `site/data/` y publica `site/` en GitHub Pages.
 
