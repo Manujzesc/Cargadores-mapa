@@ -13,7 +13,7 @@ if not key:
     raise SystemExit(1)
 print(f"::notice::Secreto REVE_API_KEY encontrado ({len(key)} caracteres)")
 
-params = {"page": 1, "limit": 1000}
+params = {"page": 1, "limit": 100}
 url = f"{BASE}/locations?{urllib.parse.urlencode(params)}"
 req = urllib.request.Request(url, headers={
     "x-api-key": key,
@@ -47,7 +47,7 @@ if isinstance(data, dict):
             items = data[k]
             break
 if isinstance(items, list):
-    print(f"::notice::Elementos recibidos con limit=1000: {len(items)}")
+    print(f"::notice::Elementos recibidos con limit=100: {len(items)}")
     if items:
         first = items[0]
         print(f"::notice::Campos de un emplazamiento: {list(first.keys())[:40] if isinstance(first, dict) else type(first)}")
