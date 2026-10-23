@@ -20,4 +20,5 @@ jobs:
       - name: Una petición a Reve
         env:
           REVE_API_KEY: ${{ secrets.REVE_API_KEY }}
+          SOLO_HUELLA: "1"
         run: python3 scripts/probar_reve.py

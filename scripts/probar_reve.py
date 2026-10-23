@@ -11,7 +11,10 @@ key = os.environ.get("REVE_API_KEY", "").strip()
 if not key:
     print("::error::No existe el secreto REVE_API_KEY (o está vacío)")
     raise SystemExit(1)
-print(f"::notice::Secreto REVE_API_KEY encontrado ({len(key)} caracteres)")
+import hashlib
+print(f"::notice::Secreto REVE_API_KEY encontrado ({len(key)} caracteres) · huella {hashlib.sha256(key.encode()).hexdigest()[:12]}")
+if os.environ.get("SOLO_HUELLA"):
+    raise SystemExit(0)
 
 params = {"page": 1, "limit": 100}
 url = f"{BASE}/locations?{urllib.parse.urlencode(params)}"
